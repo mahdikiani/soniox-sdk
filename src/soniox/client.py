@@ -85,7 +85,7 @@ class _BaseSonioxClient:
     ) -> dict:
         config_dict = config.model_dump()
         config_dict.update(
-            {"audio": audio_url} if audio_url else {"file_id": file_id},
+            {"audio_url": audio_url} if audio_url else {"file_id": file_id},
         )
         return config_dict
 
