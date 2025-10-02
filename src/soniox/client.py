@@ -168,7 +168,7 @@ class _SonioxClientSync(_BaseSonioxClient):
         with open(filepath, "rb") as f:
             files = {"file": (filepath.name, f, mime_type)}
             res = client.post(f"{self.base_url}/v1/files", files=files)
-            res.raise_for_status()
+            # res.raise_for_status()
             file_response = FileUploadResponse(**res.json())
         logger.info("File ID: %s", file_response.id)
         return file_response
@@ -208,7 +208,7 @@ class _SonioxClientSync(_BaseSonioxClient):
 
             # Make request
             response = client.post("/v1/transcriptions", json=payload)
-            response.raise_for_status()
+            # response.raise_for_status()
             result = self._handle_response(response)
 
         logger.info("Transcription completed successfully")
@@ -246,7 +246,7 @@ class _SonioxClientSync(_BaseSonioxClient):
 
             # Make request
             response = client.post("/v1/transcriptions", json=payload)
-            response.raise_for_status()
+            # response.raise_for_status()
             result = self._handle_response(response)
 
         logger.info("Transcription completed successfully")
@@ -257,7 +257,7 @@ class _SonioxClientSync(_BaseSonioxClient):
 
         with self._get_client() as client:
             response = client.get(f"/v1/transcriptions/{job_id}")
-            response.raise_for_status()
+            # response.raise_for_status()
             result = self._handle_response(response)
         return TranscriptionJob(**result)
 
@@ -266,7 +266,7 @@ class _SonioxClientSync(_BaseSonioxClient):
 
         with self._get_client() as client:
             response = client.get(f"/v1/transcriptions/{job_id}/transcript")
-            response.raise_for_status()
+            # response.raise_for_status()
             result = self._handle_response(response)
         return TranscriptionResult(**result)
 
@@ -289,7 +289,7 @@ class _SonioxClientAsync(_BaseSonioxClient):
         with open(filepath, "rb") as f:  # noqa: ASYNC230
             files = {"file": (filepath.name, f, mime_type)}
             res = await client.post(f"{self.base_url}/v1/files", files=files)
-            res.raise_for_status()
+            # res.raise_for_status()
             file_response = FileUploadResponse(**res.json())
         logger.info("File ID: %s", file_response.id)
         return file_response
@@ -332,7 +332,7 @@ class _SonioxClientAsync(_BaseSonioxClient):
 
             # Make request
             response = await client.post("/v1/transcriptions", json=payload)
-            response.raise_for_status()
+            # response.raise_for_status()
             result = self._handle_response(response)
 
         logger.info("Transcription completed successfully")
@@ -353,7 +353,7 @@ class _SonioxClientAsync(_BaseSonioxClient):
             payload = self._get_config(audio_url=url, config=config)
 
             response = await client.post("/v1/transcriptions", json=payload)
-            response.raise_for_status()
+            # response.raise_for_status()
             result = self._handle_response(response)
 
         logger.info("Transcription completed successfully")
@@ -367,7 +367,7 @@ class _SonioxClientAsync(_BaseSonioxClient):
 
         async with self._get_async_client() as client:
             response = await client.get(f"/v1/transcriptions/{job_id}")
-            response.raise_for_status()
+            # response.raise_for_status()
             result = self._handle_response(response)
         return TranscriptionJob(**result)
 
@@ -381,7 +381,7 @@ class _SonioxClientAsync(_BaseSonioxClient):
             response = await client.get(
                 f"/v1/transcriptions/{job_id}/transcript",
             )
-            response.raise_for_status()
+            # response.raise_for_status()
             result = self._handle_response(response)
         return TranscriptionResult(**result)
 
