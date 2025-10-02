@@ -104,6 +104,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ruff` - Linting and formatting
 - `mypy` - Static type checking
 
-[0.1.2]: https://github.com/mahdikiani/soniox/releases/tag/v0.1.2
-[0.1.1]: https://github.com/mahdikiani/soniox/releases/tag/v0.1.1
+[0.1.2]: https://github.com/mahdikiani/soniox-sdk/releases/tag/v0.1.2
+[0.1.1]: https://github.com/mahdikiani/soniox-sdk/releases/tag/v0.1.1
 
