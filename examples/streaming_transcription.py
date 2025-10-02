@@ -40,7 +40,7 @@ async def stream_from_file() -> None:
 
     async for chunk in client.stream_transcribe(
         audio_stream=audio_gen,
-        model="en_v2",
+        model="stt-async-preview",
         sample_rate=16000,
     ):
         # Print partial results
@@ -58,7 +58,7 @@ async def stream_with_diarization() -> None:
 
     async for chunk in client.stream_transcribe(
         audio_stream=audio_gen,
-        model="en_v2",
+        model="stt-async-preview",
         sample_rate=16000,
         enable_speaker_diarization=True,
     ):
@@ -73,7 +73,7 @@ async def stream_basic() -> None:
 
     try:
         async for chunk in client.stream_transcribe(
-            model="en_v2",
+            model="stt-async-preview",
             sample_rate=16000,
         ):
             if chunk.is_final:

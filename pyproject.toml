@@ -4,17 +4,21 @@ build-backend = "setuptools.build_meta"  # If not defined, then legacy behavior 
 
 [project]
 name = "soniox-sdk" 
-version = "0.0.1"
+version = "0.1.1"
 description = "Python SDK for Soniox speech-to-text API"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {file = "LICENSE.txt"}
 keywords = ["soniox", "speech-to-text", "api", "sdk"]
 authors = [
-  {name = "Mahdi Kiani", email = "mahdikiany@gmail.com" }
+  {name = "Mahdi Kiani", email = "mahdikiany@gmail.com" },
+  {name = "Amir Shokouhiniya", email = "Shokouhiniya@gmail.com" },
+  {name = "Pishrun", email = "dev@pish.run" }
 ]
 maintainers = [
-  {name = "Mahdi Kiani", email = "mahdikiany@gmail.com" }
+  {name = "Mahdi Kiani", email = "mahdikiany@gmail.com" },
+  {name = "Amir Shokouhiniya", email = "Shokouhiniya@gmail.com" },
+  {name = "Pishrun", email = "dev@pish.run" }
 ]
 classifiers = [
   "Development Status :: 5 - Production/Stable",
@@ -29,7 +33,7 @@ classifiers = [
 ]
 dependencies = [
     "httpx>=0.27.0",
-    "pydantic>=2.0.0",
+    "pydantic>=2.11.9",
     "websockets>=12.0",
 ]
 [project.optional-dependencies]
@@ -39,6 +43,7 @@ test = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
     "pytest-cov>=4.1.0",
+    "pytest-httpx>=0.35.0",
     "pytest-mock>=3.12.0",
     "respx>=0.20.0",
 ]
@@ -90,7 +95,7 @@ select = [
   "ISC",   # implicit string concatenation
   "G",     # misuse of logging string interpolation
   # "D",     # docstrings: docstring checking
-  "ERA", # remove commented code
+  # "ERA", # remove commented code
   "RUF", # ruff-specific improvements
 ]
 [tool.ruff.lint.per-file-ignores]

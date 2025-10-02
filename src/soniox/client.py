@@ -1,36 +1,42 @@
 """Soniox API client implementation."""
 
-import json
 import logging
+import mimetypes
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, Generator
+from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
 
 import httpx
-import websockets
 
-from soniox.exceptions import (
+from .exceptions import (
     SonioxAPIError,
     SonioxAuthenticationError,
     SonioxRateLimitError,
 )
-from soniox.models import StreamingChunk, TranscriptionResponse
+from .models import (
+    FileUploadResponse,
+    TranscriptionConfig,
+    TranscriptionJob,
+    TranscriptionResult,
+)
 
 # Set up logger
 logger = logging.getLogger("soniox")
 
 
-class SonioxClient:
-    """Soniox API client for speech-to-text operations."""
+class _BaseSonioxClient:
+    """Base class for Soniox API clients."""
 
     BASE_URL = "https://api.soniox.com"
-    WS_URL = "wss://api.soniox.com/ws"
+    WS_URL = "wss://stt-rt.soniox.com/transcribe-websocket"
 
     def __init__(
         self,
         api_key: str | None = None,
         base_url: str | None = None,
         timeout: float = 60.0,
+        **kwargs: object,
     ) -> None:
         """Initialize Soniox client.
 
@@ -68,10 +74,20 @@ class SonioxClient:
 
     def _get_headers(self) -> dict[str, str]:
         """Get HTTP headers for API requests."""
-        return {
-            "api-key": self.api_key,
-            "Content-Type": "application/json",
-        }
+        return {"Authorization": f"Bearer {self.api_key}"}
+
+    def _get_config(
+        self,
+        audio_url: str | None = None,
+        file_id: str | None = None,
+        *,
+        config: TranscriptionConfig,
+    ) -> dict:
+        config_dict = config.model_dump()
+        config_dict.update(
+            {"audio": audio_url} if audio_url else {"file_id": file_id},
+        )
+        return config_dict
 
     def _handle_response(self, response: httpx.Response) -> dict[str, object]:
         """Handle API response and raise appropriate errors.
@@ -86,7 +102,7 @@ class SonioxClient:
             SonioxRateLimitError: If rate limit is exceeded (429)
             SonioxAPIError: For other API errors
         """
-        if response.status_code == 200:
+        if response.status_code in [200, 201]:
             return response.json()
 
         error_body = response.text
@@ -115,20 +131,59 @@ class SonioxClient:
             response_body=error_body,
         )
 
+    @contextmanager
+    def _get_client(self) -> Generator[httpx.Client]:
+        with httpx.Client(
+            timeout=self.timeout,
+            headers=self._get_headers(),
+            base_url=self.base_url,
+        ) as client:
+            yield client
+
+    @asynccontextmanager
+    async def _get_async_client(self) -> AsyncGenerator[httpx.AsyncClient]:
+        async with httpx.AsyncClient(
+            timeout=self.timeout,
+            headers=self._get_headers(),
+            base_url=self.base_url,
+        ) as client:
+            yield client
+
+
+class _SonioxClientSync(_BaseSonioxClient):
+    """Soniox API client for speech-to-text operations."""
+
+    def _upload_file(
+        self,
+        file_path: str,
+        client: httpx.Client,
+    ) -> FileUploadResponse:
+        # Check if file exists
+        filepath = Path(file_path)
+        if not filepath.exists():
+            logger.error("File not found: %s", file_path)
+            raise FileNotFoundError(f"Audio file not found: {file_path}")
+
+        mime_type = mimetypes.guess_type(filepath.name)[0]
+        with open(filepath, "rb") as f:
+            files = {"file": (filepath.name, f, mime_type)}
+            res = client.post(f"{self.base_url}/v1/files", files=files)
+            res.raise_for_status()
+            file_response = FileUploadResponse(**res.json())
+        logger.info("File ID: %s", file_response.id)
+        return file_response
+
     def transcribe_file(
         self,
         file_path: str,
-        model: str = "en_v2",
-        language: str | None = None,
-        enable_speaker_diarization: bool = False,
-        enable_translation: bool = False,
+        config: TranscriptionConfig | None = None,
         **kwargs: object,
-    ) -> TranscriptionResponse:
+    ) -> TranscriptionJob:
         """Transcribe audio file synchronously.
 
         Args:
             file_path: Path to audio file
-            model: Model to use (default: en_v2)
+            model: Model to use (default: stt-async-preview)
             language: Language code (e.g., 'en', 'es')
             enable_speaker_diarization: Enable speaker diarization
             enable_translation: Enable translation to English
@@ -142,55 +197,76 @@ class SonioxClient:
             SonioxAPIError: If API returns an error
         """
         logger.info("Transcribing file: %s", file_path)
+        if not config:
+            config = TranscriptionConfig(**kwargs)
 
+        with self._get_client() as client:
+            file_response = self._upload_file(file_path, client=client)
+
+            # Prepare request payload
+            payload = self._get_config(file_id=file_response.id, config=config)
+
+            # Make request
+            response = client.post("/v1/transcriptions", json=payload)
+            response.raise_for_status()
+            result = self._handle_response(response)
+
+        logger.info("Transcription completed successfully")
+        return TranscriptionJob(**result)
+
+    def get_transcription_job(self, job_id: str) -> TranscriptionJob:
+        """Get transcription job."""
+
+        with self._get_client() as client:
+            response = client.get(f"/v1/transcriptions/{job_id}")
+            response.raise_for_status()
+            result = self._handle_response(response)
+        return TranscriptionJob(**result)
+
+    def get_transcription_result(self, job_id: str) -> TranscriptionResult:
+        """Get transcription job."""
+
+        with self._get_client() as client:
+            response = client.get(f"/v1/transcriptions/{job_id}/transcript")
+            response.raise_for_status()
+            result = self._handle_response(response)
+        return TranscriptionResult(**result)
+
+
+class _SonioxClientAsync(_BaseSonioxClient):
+    """Soniox API client for speech-to-text operations asynchronously."""
+
+    async def _upload_file_async(
+        self,
+        file_path: str,
+        client: httpx.AsyncClient,
+    ) -> FileUploadResponse:
         # Check if file exists
-        path = Path(file_path)
-        if not path.exists():
+        filepath = Path(file_path)
+        if not filepath.exists():
             logger.error("File not found: %s", file_path)
             raise FileNotFoundError(f"Audio file not found: {file_path}")
 
-        # Read audio file
-        audio_data = path.read_bytes()
-
-        # Prepare request payload
-        payload = {
-            "audio": audio_data.hex(),  # Convert bytes to hex string
-            "model": model,
-            "enable_speaker_diarization": enable_speaker_diarization,
-            "enable_translation": enable_translation,
-        }
-
-        if language:
-            payload["language"] = language
-
-        payload.update(kwargs)
-
-        # Make request
-        with httpx.Client(timeout=self.timeout) as client:
-            response = client.post(
-                f"{self.base_url}/transcribe",
-                json=payload,
-                headers=self._get_headers(),
-            )
-
-        result = self._handle_response(response)
-        logger.info("Transcription completed successfully")
-        return TranscriptionResponse(**result)
+        mime_type = mimetypes.guess_type(filepath.name)[0]
+        with open(filepath, "rb") as f:  # noqa: ASYNC230
+            files = {"file": (filepath.name, f, mime_type)}
+            res = await client.post(f"{self.base_url}/v1/files", files=files)
+            res.raise_for_status()
+            file_response = FileUploadResponse(**res.json())
+        logger.info("File ID: %s", file_response.id)
+        return file_response
 
     async def transcribe_file_async(
         self,
         file_path: str,
-        model: str = "en_v2",
-        language: str | None = None,
-        enable_speaker_diarization: bool = False,
-        enable_translation: bool = False,
+        config: TranscriptionConfig | None = None,
         **kwargs: object,
-    ) -> TranscriptionResponse:
-        """Transcribe audio file asynchronously.
+    ) -> TranscriptionJob:
+        """Transcribe audio file synchronously.
 
         Args:
             file_path: Path to audio file
-            model: Model to use (default: en_v2)
+            model: Model to use (default: stt-async-preview)
             language: Language code (e.g., 'en', 'es')
             enable_speaker_diarization: Enable speaker diarization
             enable_translation: Enable translation to English
@@ -203,212 +279,56 @@ class SonioxClient:
             FileNotFoundError: If file doesn't exist
             SonioxAPIError: If API returns an error
         """
-        logger.info("Transcribing file (async): %s", file_path)
+        logger.info("Transcribing file: %s", file_path)
+        if not config:
+            config = TranscriptionConfig(**kwargs)
 
-        # Check if file exists
-        path = Path(file_path)
-        if not path.exists():
-            logger.error("File not found: %s", file_path)
-            raise FileNotFoundError(f"Audio file not found: {file_path}")
-
-        # Read audio file
-        audio_data = path.read_bytes()
-
-        # Prepare request payload
-        payload = {
-            "audio": audio_data.hex(),  # Convert bytes to hex string
-            "model": model,
-            "enable_speaker_diarization": enable_speaker_diarization,
-            "enable_translation": enable_translation,
-        }
-
-        if language:
-            payload["language"] = language
-
-        payload.update(kwargs)
-
-        # Make request
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.post(
-                f"{self.base_url}/transcribe",
-                json=payload,
-                headers=self._get_headers(),
+        async with self._get_async_client() as client:
+            file_response = await self._upload_file_async(
+                file_path,
+                client=client,
             )
 
-        result = self._handle_response(response)
-        logger.info("Transcription completed successfully (async)")
-        return TranscriptionResponse(**result)
+            # Prepare request payload
+            payload = self._get_config(file_id=file_response.id, config=config)
 
-    def transcribe_url(
+            # Make request
+            response = await client.post("/v1/transcriptions", json=payload)
+            response.raise_for_status()
+            result = self._handle_response(response)
+
+        logger.info("Transcription completed successfully")
+        return TranscriptionJob(**result)
+
+    async def get_transcription_job_async(
         self,
-        audio_url: str,
-        model: str = "en_v2",
-        language: str | None = None,
-        enable_speaker_diarization: bool = False,
-        enable_translation: bool = False,
-        **kwargs: object,
-    ) -> TranscriptionResponse:
-        """Transcribe audio from URL synchronously.
+        job_id: str,
+    ) -> TranscriptionJob:
+        """Get transcription job."""
 
-        Args:
-            audio_url: URL to audio file
-            model: Model to use (default: en_v2)
-            language: Language code (e.g., 'en', 'es')
-            enable_speaker_diarization: Enable speaker diarization
-            enable_translation: Enable translation to English
-            **kwargs: Additional parameters
+        async with self._get_async_client() as client:
+            response = await client.get(f"/v1/transcriptions/{job_id}")
+            response.raise_for_status()
+            result = self._handle_response(response)
+        return TranscriptionJob(**result)
 
-        Returns:
-            TranscriptionResponse object
+    async def get_transcription_result_async(
+        self,
+        job_id: str,
+    ) -> TranscriptionResult:
+        """Get transcription job."""
 
-        Raises:
-            SonioxAPIError: If API returns an error
-        """
-        logger.info("Transcribing URL: %s", audio_url)
-
-        # Prepare request payload
-        payload = {
-            "audio_url": audio_url,
-            "model": model,
-            "enable_speaker_diarization": enable_speaker_diarization,
-            "enable_translation": enable_translation,
-        }
-
-        if language:
-            payload["language"] = language
-
-        payload.update(kwargs)
-
-        # Make request
-        with httpx.Client(timeout=self.timeout) as client:
-            response = client.post(
-                f"{self.base_url}/transcribe",
-                json=payload,
-                headers=self._get_headers(),
+        async with self._get_async_client() as client:
+            response = await client.get(
+                f"/v1/transcriptions/{job_id}/transcript",
             )
+            response.raise_for_status()
+            result = self._handle_response(response)
+        return TranscriptionResult(**result)
 
-        result = self._handle_response(response)
-        logger.info("Transcription from URL completed successfully")
-        return TranscriptionResponse(**result)
 
-    async def transcribe_url_async(
-        self,
-        audio_url: str,
-        model: str = "en_v2",
-        language: str | None = None,
-        enable_speaker_diarization: bool = False,
-        enable_translation: bool = False,
-        **kwargs: object,
-    ) -> TranscriptionResponse:
-        """Transcribe audio from URL asynchronously.
-
-        Args:
-            audio_url: URL to audio file
-            model: Model to use (default: en_v2)
-            language: Language code (e.g., 'en', 'es')
-            enable_speaker_diarization: Enable speaker diarization
-            enable_translation: Enable translation to English
-            **kwargs: Additional parameters
-
-        Returns:
-            TranscriptionResponse object
-
-        Raises:
-            SonioxAPIError: If API returns an error
-        """
-        logger.info("Transcribing URL (async): %s", audio_url)
-
-        # Prepare request payload
-        payload = {
-            "audio_url": audio_url,
-            "model": model,
-            "enable_speaker_diarization": enable_speaker_diarization,
-            "enable_translation": enable_translation,
-        }
-
-        if language:
-            payload["language"] = language
-
-        payload.update(kwargs)
-
-        # Make request
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.post(
-                f"{self.base_url}/transcribe",
-                json=payload,
-                headers=self._get_headers(),
-            )
-
-        result = self._handle_response(response)
-        logger.info("Transcription from URL completed successfully (async)")
-        return TranscriptionResponse(**result)
-
-    async def stream_transcribe(
-        self,
-        audio_stream: AsyncIterator[bytes] | None = None,
-        model: str = "en_v2",
-        sample_rate: int = 16000,
-        enable_speaker_diarization: bool = False,
-        **kwargs: object,
-    ) -> AsyncIterator[StreamingChunk]:
-        """Stream audio for real-time transcription.
-
-        Args:
-            audio_stream: Async iterator yielding audio chunks
-            model: Model to use (default: en_v2)
-            sample_rate: Audio sample rate in Hz (default: 16000)
-            enable_speaker_diarization: Enable speaker diarization
-            **kwargs: Additional parameters
-
-        Yields:
-            StreamingChunk objects with partial transcription results
-
-        Raises:
-            ConnectionError: If WebSocket connection fails
-        """
-        logger.info("Starting streaming transcription")
-
-        # Prepare WebSocket URL with parameters
-        ws_url = f"{self.WS_URL}/stream"
-
-        # Prepare config message
-        config = {
-            "model": model,
-            "sample_rate": sample_rate,
-            "enable_speaker_diarization": enable_speaker_diarization,
-            **kwargs,
-        }
-
-        try:
-            async with websockets.connect(
-                ws_url,
-                extra_headers={"api-key": self.api_key},
-            ) as websocket:
-                # Send configuration
-                await websocket.send(json.dumps(config))
-                logger.debug("Sent configuration to WebSocket")
-
-                # Send audio chunks if provided
-                if audio_stream:
-                    async for audio_chunk in audio_stream:
-                        await websocket.send(audio_chunk)
-                        logger.debug(
-                            "Sent audio chunk: %d bytes",
-                            len(audio_chunk),
-                        )
-
-                # Receive transcription results
-                while True:
-                    try:
-                        message = await websocket.recv()
-                        data = json.loads(message)
-                        chunk = StreamingChunk(**data)
-                        logger.debug("Received chunk: %s", chunk.text)
-                        yield chunk
-                    except websockets.exceptions.ConnectionClosed:
-                        logger.info("WebSocket connection closed")
-                        break
-
-        except Exception:
-            logger.exception("Streaming error")
-            raise
+class SonioxClient(
+    _SonioxClientSync,
+    _SonioxClientAsync,
+):
+    """Soniox API client."""

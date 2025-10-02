@@ -14,10 +14,7 @@ client = SonioxClient(api_key="your-api-key-here")
 def transcribe_local_file(audio_file: str) -> None:
     """Transcribe a local audio file."""
 
-    response = client.transcribe_file(
-        audio_file,
-        model="en_v2",
-    )
+    response = client.transcribe_file(audio_file, model="stt-async-preview")
 
     # Access word-level details
     for _word in response.result.words[:5]:  # First 5 words
@@ -30,11 +27,11 @@ def transcribe_from_url(audio_url: str) -> None:
     client.transcribe_url(audio_url)
 
 
-def transcribe_with_diarization() -> None:
+def transcribe_with_diarization(audio_file: str) -> None:
     """Transcribe with speaker diarization."""
 
     response = client.transcribe_file(
-        "path/to/conversation.wav",
+        audio_file,
         enable_speaker_diarization=True,
     )
 
@@ -51,13 +48,10 @@ def transcribe_with_diarization() -> None:
         " ".join(words)
 
 
-def transcribe_with_translation() -> None:
+def transcribe_with_translation(audio_url: str) -> None:
     """Transcribe and translate to English."""
 
-    client.transcribe_url(
-        "https://example.com/spanish_audio.mp3",
-        enable_translation=True,
-    )
+    client.transcribe_url(audio_url, enable_translation=True)
 
 
 if __name__ == "__main__":
@@ -65,7 +59,7 @@ if __name__ == "__main__":
     try:
         transcribe_local_file(audio_file="path/to/your/audio.wav")
         transcribe_from_url(audio_url="https://example.com/audio.mp3")
-        # transcribe_with_diarization()
-        # transcribe_with_translation()
+        transcribe_with_diarization(audio_file="path/to/your/audio.wav")
+        transcribe_with_translation(audio_url="https://example.com/audio.mp3")
     except Exception:
         logging.exception("Basic usage error")
