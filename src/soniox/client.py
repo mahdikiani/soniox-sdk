@@ -214,6 +214,44 @@ class _SonioxClientSync(_BaseSonioxClient):
         logger.info("Transcription completed successfully")
         return TranscriptionJob(**result)
 
+    def transcribe_url(
+        self,
+        url: str,
+        config: TranscriptionConfig | None = None,
+        **kwargs: object,
+    ) -> TranscriptionJob:
+        """Transcribe audio file synchronously.
+
+        Args:
+            url: URL to audio file
+            model: Model to use (default: stt-async-preview)
+            language: Language code (e.g., 'en', 'es')
+            enable_speaker_diarization: Enable speaker diarization
+            enable_translation: Enable translation to English
+            **kwargs: Additional parameters
+
+        Returns:
+            TranscriptionResponse object
+
+        Raises:
+            SonioxAPIError: If API returns an error
+        """
+        logger.info("Transcribing file: %s", url)
+        if not config:
+            config = TranscriptionConfig(**kwargs)
+
+        with self._get_client() as client:
+            # Prepare request payload
+            payload = self._get_config(audio_url=url, config=config)
+
+            # Make request
+            response = client.post("/v1/transcriptions", json=payload)
+            response.raise_for_status()
+            result = self._handle_response(response)
+
+        logger.info("Transcription completed successfully")
+        return TranscriptionJob(**result)
+
     def get_transcription_job(self, job_id: str) -> TranscriptionJob:
         """Get transcription job."""
 
@@ -293,6 +331,27 @@ class _SonioxClientAsync(_BaseSonioxClient):
             payload = self._get_config(file_id=file_response.id, config=config)
 
             # Make request
+            response = await client.post("/v1/transcriptions", json=payload)
+            response.raise_for_status()
+            result = self._handle_response(response)
+
+        logger.info("Transcription completed successfully")
+        return TranscriptionJob(**result)
+
+    async def transcribe_url_async(
+        self,
+        url: str,
+        config: TranscriptionConfig | None = None,
+        **kwargs: object,
+    ) -> TranscriptionJob:
+        """Transcribe audio file synchronously."""
+        logger.info("Transcribing file: %s", url)
+        if not config:
+            config = TranscriptionConfig(**kwargs)
+
+        async with self._get_async_client() as client:
+            payload = self._get_config(audio_url=url, config=config)
+
             response = await client.post("/v1/transcriptions", json=payload)
             response.raise_for_status()
             result = self._handle_response(response)
