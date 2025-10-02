@@ -5,7 +5,7 @@ from pytest_httpx import HTTPXMock
 
 from src.soniox import SonioxClient
 from src.soniox.exceptions import SonioxAPIError
-from src.soniox.models import (
+from src.soniox.types import (
     TranscriptionConfig,
 )
 

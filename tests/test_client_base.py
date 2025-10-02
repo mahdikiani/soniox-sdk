@@ -3,7 +3,7 @@
 import pytest
 
 from src.soniox import SonioxClient
-from src.soniox.models import TranscriptionConfig
+from src.soniox.types import TranscriptionConfig
 
 
 class TestClientInitialization:

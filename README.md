@@ -104,8 +104,8 @@ You can pass configuration options either as a `TranscriptionConfig` object or a
 
 ```python
 from soniox import SonioxClient
-from soniox.models import TranscriptionConfig
 from soniox.languages import Language
+from soniox.types import TranscriptionConfig
 
 client = SonioxClient()
 
@@ -434,7 +434,7 @@ See [tests/README.md](tests/README.md) for more details on the test suite.
 
 ```bash
 # Clone the repository
-git clone https://github.com/mahdikiani/soniox.git
+git clone https://github.com/mahdikiani/soniox-sdk.git
 cd soniox
 
 # Install in editable mode with dev dependencies
@@ -451,8 +451,8 @@ mypy src/
 
 - [Soniox Documentation](https://soniox.com/docs/)
 - [API Reference](https://soniox.com/docs/)
-- [GitHub Repository](https://github.com/mahdikiani/soniox)
-- [Issue Tracker](https://github.com/mahdikiani/soniox/issues)
+- [GitHub Repository](https://github.com/mahdikiani-sdk/soniox-sdk)
+- [Issue Tracker](https://github.com/mahdikiani/soniox-sdk/issues)
 
 ## License
 
@@ -461,8 +461,8 @@ This project is licensed under the MIT License - see the [LICENSE.txt](LICENSE.t
 ## Support
 
 - 📧 Email: mahdikiany@gmail.com
-- 🐛 Issues: [GitHub Issues](https://github.com/mahdikiani/soniox/issues)
-- 💬 Discussions: [GitHub Discussions](https://github.com/mahdikiani/soniox/discussions)
+- 🐛 Issues: [GitHub Issues](https://github.com/mahdikiani/soniox-sdk/issues)
+- 💬 Discussions: [GitHub Discussions](https://github.com/mahdikiani/soniox-sdk/discussions)
 
 ## Changelog
 

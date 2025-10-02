@@ -14,7 +14,7 @@ from .exceptions import (
     SonioxAuthenticationError,
     SonioxRateLimitError,
 )
-from .models import (
+from .types import (
     FileUploadResponse,
     TranscriptionConfig,
     TranscriptionJob,

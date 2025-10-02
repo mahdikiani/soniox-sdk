@@ -6,7 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from src.soniox.languages import Language
-from src.soniox.models import (
+from src.soniox.types import (
     AudioFormat,
     FileUploadResponse,
     StreamingChunk,
