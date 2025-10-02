@@ -275,6 +275,13 @@ class TranscriptionJob(TranscriptionConfig):
         return v
 
 
+class TranscriptionWebhook(BaseModel):
+    """Transcript."""
+
+    id: str = Field(..., description="Transcript ID")
+    status: TranscriptionJobStatus = Field(..., description="Job status")
+
+
 class TranscriptionResult(BaseModel):
     """Transcript."""
 
