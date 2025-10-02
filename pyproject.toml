@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"  # If not defined, then legacy behavior can happen.
 
 [project]
-name = "soniox" 
+name = "soniox-sdk" 
 version = "0.0.1"
 description = "Python SDK for Soniox speech-to-text API"
 readme = "README.md"
