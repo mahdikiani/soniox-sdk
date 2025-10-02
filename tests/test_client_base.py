@@ -67,7 +67,7 @@ class TestClientConfig:
             audio_url="https://example.com/audio.wav",
             config=config,
         )
-        assert result["audio"] == "https://example.com/audio.wav"
+        assert result["audio_url"] == "https://example.com/audio.wav"
         assert result["model"] == "stt-async-v2"
         assert "file_id" not in result
 
